@@ -1,389 +1,170 @@
-
 package com.skillbharat.cadpro
 
 import android.os.Bundle
+import android.graphics.Bitmap
+import android.graphics.pdf.PdfRenderer
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-
-data class CadShape(
-    val type: String,
-    val start: Offset,
-    val end: Offset,
-    val layer: String
-)
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.ui.geometry.Offset
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { CadApp() }
+        setContent {
+            MaterialTheme {
+                CadApp()
+            }
+        }
     }
 }
-
 @Composable
 fun CadApp() {
-    var page by remember { mutableStateOf("Home") }
+    var screen by remember { mutableStateOf("Home") }
+    var pdfUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var cadName by remember { mutableStateOf("") }
 
-    MaterialTheme {
-        Column(
-            Modifier.fillMaxSize()
-                .background(Color(0xFF101820))
-        ) {
-            Text(
-                "SKILL BHARAT CAD PRO",
-                color = Color.White,
-                fontSize = 20.sp,
-                modifier = Modifier.fillMaxWidth()
-                    .background(Color(0xFF073B78))
-                    .padding(16.dp)
-            )
-
-            when (page) {
-                "Home" -> HomeScreen { page = it }
-                "Drawing" -> DrawingScreen { page = "Home" }
-                "3D" -> ThreeDScreen()
-                "Measurement" -> MeasurementScreen()
-            }
+    val pdfPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            pdfUri = uri
+            screen = "PDF"
         }
     }
-}
 
-@Composable
-fun HomeScreen(open: (String) -> Unit) {
+    val cadPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            cadName = uri.lastPathSegment ?: "CAD File"
+            screen = "CAD"
+        }
+    }
+
     Column(
         Modifier.fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+            .background(Color(0xFF101820))
     ) {
         Text(
-            "Professional CAD Workspace",
+            "SKILL BHARAT CAD PRO",
             color = Color.White,
-            fontSize = 24.sp
+            fontSize = 21.sp,
+            modifier = Modifier.fillMaxWidth()
+                .background(Color(0xFF073B78))
+                .padding(16.dp)
         )
 
-        Button(
-            onClick = { open("Drawing") },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        ) {
-            Text("2D CAD Drawing")
-        }
-
-        Button(
-            onClick = { open("3D") },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        ) {
-            Text("3D Design")
-        }
-
-        Button(
-            onClick = { open("Measurement") },
-            modifier = Modifier.fillMaxWidth().height(60.dp)
-        ) {
-            Text("Measurement Tools")
-        }
-    }
-}
-
-@Composable
-fun DrawingScreen(back: () -> Unit) {
-    var selected by remember { mutableStateOf("Line") }
-    var shapes by remember { mutableStateOf(listOf<CadShape>()) }
-    var redoShapes by remember { mutableStateOf(listOf<CadShape>()) }
-    var start by remember { mutableStateOf<Offset?>(null) }
-    var current by remember { mutableStateOf(Offset.Zero) }
-    var showGrid by remember { mutableStateOf(true) }
-    var snap by remember { mutableStateOf(false) }
-    var layer by remember { mutableStateOf("Layer 1") }
-    var layerMenu by remember { mutableStateOf(false) }
-
-    val tools = listOf(
-        "Line", "Circle", "Rectangle",
-        "Polyline", "Arc", "Polygon"
-    )
-
-    Column(
-        Modifier.fillMaxSize()
-            .background(Color(0xFF18232F))
-    ) {
-        Button(onClick = back) {
-            Text("Back")
-        }
-
-        Row(
-            Modifier.fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-        ) {
-            tools.forEach { tool ->
-                Button(
-                    onClick = { selected = tool },
-                    modifier = Modifier.padding(3.dp)
-                ) {
-                    Text(tool)
-                }
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-        ) {
-            Button(onClick = {
-                if (shapes.isNotEmpty()) {
-                    redoShapes = redoShapes + shapes.last()
-                    shapes = shapes.dropLast(1)
-                }
-            }) { Text("Undo") }
-
-            Button(onClick = {
-                if (redoShapes.isNotEmpty()) {
-                    shapes = shapes + redoShapes.last()
-                    redoShapes = redoShapes.dropLast(1)
-                }
-            }) { Text("Redo") }
-
-            Button(onClick = {
-                shapes = emptyList()
-                redoShapes = emptyList()
-            }) { Text("Clear") }
-
-            Button(onClick = {
-                showGrid = !showGrid
-            }) {
-                Text(if (showGrid) "Grid ON" else "Grid OFF")
-            }
-
-            Button(onClick = {
-                snap = !snap
-            }) {
-                Text(if (snap) "Snap ON" else "Snap OFF")
-            }
-        }
-
-        Row(
-            Modifier.fillMaxWidth().padding(5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Layer:", color = Color.White)
-
-            Button(onClick = { layerMenu = true }) {
-                Text(layer)
-            }
-
-            DropdownMenu(
-                expanded = layerMenu,
-                onDismissRequest = { layerMenu = false }
+        when (screen) {
+            "Home" -> Column(
+                Modifier.fillMaxSize().padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                listOf("Layer 1", "Layer 2", "Layer 3").forEach {
-                    DropdownMenuItem(
-                        text = { Text(it) },
-                        onClick = {
-                            layer = it
-                            layerMenu = false
-                        }
-                    )
+                Button(
+                    onClick = {
+                        pdfPicker.launch(arrayOf("application/pdf"))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("OPEN PDF FILE")
                 }
+
+                Button(
+                    onClick = {
+                        cadPicker.launch(arrayOf("*/*"))
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("OPEN DWG / DXF FILE")
+                }
+
+                Button(
+                    onClick = { screen = "Drawing" },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("2D CAD DRAWING")
+                }
+
+                Button(
+                    onClick = { screen = "Measure" },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("MEASUREMENT TOOLS")
+                }
+            }
+
+            "PDF" -> PdfViewer(pdfUri) {
+                screen = "Home"
+            }
+
+            "CAD" -> CadFileScreen(cadName) {
+                screen = "Home"
+            }
+
+            "Drawing" -> DrawingScreen {
+                screen = "Home"
+            }
+
+            "Measure" -> MeasureScreen {
+                screen = "Home"
             }
         }
-
-        Canvas(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                .background(Color(0xFF0B1118))
-                .pointerInput(selected, snap, layer) {
-                    detectDragGestures(
-                        onDragStart = { position ->
-                            val point = if (snap) {
-                                Offset(
-                                    (position.x / 20).toInt() * 20f,
-                                    (position.y / 20).toInt() * 20f
-                                )
-                            } else position
-
-                            start = point
-                            current = point
-                        },
-                        onDrag = { change, _ ->
-                            current = change.position
-                        },
-                        onDragEnd = {
-                            start?.let { first ->
-                                shapes = shapes + CadShape(
-                                    selected,
-                                    first,
-                                    current,
-                                    layer
-                                )
-                                redoShapes = emptyList()
-                            }
-                            start = null
-                        }
-                    )
-                }
-        ) {
-            if (showGrid) {
-                var x = 0f
-                while (x < size.width) {
-                    drawLine(
-                        Color(0xFF263747),
-                        Offset(x, 0f),
-                        Offset(x, size.height)
-                    )
-                    x += 40f
-                }
-
-                var y = 0f
-                while (y < size.height) {
-                    drawLine(
-                        Color(0xFF263747),
-                        Offset(0f, y),
-                        Offset(size.width, y)
-                    )
-                    y += 40f
-                }
-            }
-
-            val drawing = if (start != null) {
-                shapes + CadShape(selected, start!!, current, layer)
-            } else shapes
-
-            drawing.forEach { shape ->
-                val a = shape.start
-                val b = shape.end
-
-                val color = when (shape.layer) {
-                    "Layer 1" -> Color.Cyan
-                    "Layer 2" -> Color.Yellow
-                    else -> Color.Green
-                }
-
-                when (shape.type) {
-                    "Line" -> drawLine(color, a, b, 3f)
-
-                    "Circle" -> drawCircle(
-                        color,
-                        (b - a).getDistance(),
-                        a,
-                        style = Stroke(3f)
-                    )
-
-                    "Rectangle" -> drawRect(
-                        color,
-                        topLeft = Offset(
-                            minOf(a.x, b.x),
-                            minOf(a.y, b.y)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(
-                            kotlin.math.abs(b.x - a.x),
-                            kotlin.math.abs(b.y - a.y)
-                        ),
-                        style = Stroke(3f)
-                    )
-
-                    "Polyline" -> {
-                        val middle = Offset(
-                            (a.x + b.x) / 2,
-                            minOf(a.y, b.y) - 35f
-                        )
-                        drawLine(color, a, middle, 3f)
-                        drawLine(color, middle, b, 3f)
-                    }
-
-                    "Arc" -> drawArc(
-                        color = color,
-                        startAngle = 0f,
-                        sweepAngle = 180f,
-                        useCenter = false,
-                        topLeft = Offset(
-                            minOf(a.x, b.x),
-                            minOf(a.y, b.y)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(
-                            kotlin.math.abs(b.x - a.x),
-                            kotlin.math.abs(b.y - a.y)
-                        ),
-                        style = Stroke(3f)
-                    )
-
-                    "Polygon" -> {
-                        val path = Path().apply {
-                            moveTo(a.x, a.y)
-                            lineTo(b.x, a.y)
-                            lineTo((a.x + b.x) / 2, b.y)
-                            close()
-                        }
-                        drawPath(path, color, style = Stroke(3f))
-                    }
-                }
-            }
-        }
-
-        Text(
-            "Tool: $selected | Objects: ${shapes.size}",
-            color = Color.White,
-            modifier = Modifier.padding(8.dp)
-        )
     }
 }
-
 @Composable
-fun ThreeDScreen() {
+fun CadFileScreen(
+    fileName: String,
+    back: () -> Unit
+) {
     Column(
-        Modifier.fillMaxSize()
-            .background(Color(0xFF18232F))
-            .padding(16.dp)
+        Modifier.fillMaxSize().padding(16.dp)
     ) {
+        Text(fileName, color = Color.White)
+        Spacer(Modifier.height(16.dp))
         Text(
-            "3D Design Workspace",
-            color = Color.White,
-            fontSize = 22.sp
+            "DWG / DXF ফাইল নির্বাচন করা হয়েছে।",
+            color = Color.White
+        )
+        Text(
+            "CAD Engine এখনো যুক্ত হয়নি।",
+            color = Color.Yellow
         )
         Spacer(Modifier.height(20.dp))
-        Text(
-            "3D modelling tools will be added in the next stage.",
-            color = Color.LightGray
-        )
+        Button(onClick = back) {
+            Text("BACK")
+        }
     }
 }
 
 @Composable
-fun MeasurementScreen() {
-    var length by remember { mutableStateOf("10") }
-    var width by remember { mutableStateOf("10") }
-    var unit by remember { mutableStateOf("Feet") }
-
-    val area = (length.toDoubleOrNull() ?: 0.0) *
-            (width.toDoubleOrNull() ?: 0.0)
+fun MeasureScreen(back: () -> Unit) {
+    var unit by remember { mutableStateOf("CM") }
+    var length by remember { mutableStateOf("100") }
 
     Column(
-        Modifier.fillMaxSize()
-            .background(Color(0xFF18232F))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        Modifier.fillMaxSize().padding(16.dp)
     ) {
-        Text(
-            "Measurement Tools",
-            color = Color.White,
-            fontSize = 22.sp
-        )
+        Text("MEASUREMENT", color = Color.White)
 
         OutlinedTextField(
             value = length,
@@ -391,27 +172,149 @@ fun MeasurementScreen() {
             label = { Text("Length") }
         )
 
-        OutlinedTextField(
-            value = width,
-            onValueChange = { width = it },
-            label = { Text("Width") }
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            RadioButton(
+                selected = unit == "CM",
+                onClick = { unit = "CM" }
+            )
+            Text("CM", color = Color.White)
 
-        Text("Measurement Unit", color = Color.White)
-
-        Row {
-            listOf("Feet", "Inches", "CM").forEach {
-                Button(onClick = { unit = it }) {
-                    Text(it)
-                }
-            }
+            RadioButton(
+                selected = unit == "Feet/Inches",
+                onClick = { unit = "Feet/Inches" }
+            )
+            Text("Feet/Inches", color = Color.White)
         }
 
         Text(
-            "Area: ${"%.2f".format(area)} $unit²",
-            color = Color.Green,
-            fontSize = 20.sp
+            "Unit: $unit",
+            color = Color.Green
         )
+
+        Button(onClick = back) {
+            Text("BACK")
+        }
+    }
+}
+@Composable
+fun PdfViewer(
+    uri: android.net.Uri?,
+    back: () -> Unit
+) {
+    val context = LocalContext.current
+    var pages by remember { mutableStateOf<List<Bitmap>>(emptyList()) }
+    var error by remember { mutableStateOf("") }
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var pan by remember { mutableStateOf(Offset.Zero) }
+
+    LaunchedEffect(uri) {
+        if (uri != null) {
+            try {
+                pages = withContext(Dispatchers.IO) {
+                    val result = mutableListOf<Bitmap>()
+                    val descriptor =
+                        context.contentResolver.openFileDescriptor(uri, "r")
+                            ?: throw Exception("PDF খুলতে পারছি না")
+
+                    val renderer = PdfRenderer(descriptor)
+                    for (i in 0 until renderer.pageCount) {
+                        val page = renderer.openPage(i)
+                        val bitmap = Bitmap.createBitmap(
+                            page.width.coerceAtMost(1600),
+                            page.height.coerceAtMost(1600),
+                            Bitmap.Config.ARGB_8888
+                        )
+                        page.render(
+                            bitmap, null, null,
+                            PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                        )
+                        result.add(bitmap)
+                        page.close()
+                    }
+                    renderer.close()
+                    descriptor.close()
+                    result
+                }
+            } catch (e: Exception) {
+                error = e.message ?: "PDF খুলতে সমস্যা হয়েছে"
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize().background(Color(0xFF202A35))) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = back) { Text("BACK") }
+            Text("PDF VIEWER", color = Color.White)
+        }
+
+        Text("Zoom: ${(zoom * 100).toInt()}%", color = Color.White)
+
+        if (error.isNotEmpty()) {
+            Text(error, color = Color.Red)
+        }
+
+        Box(
+            Modifier.fillMaxSize()
+                .pointerInput(Unit) {
+                    detectTransformGestures { _, panChange, zoomChange, _ ->
+                        zoom = (zoom * zoomChange).coerceIn(1f, 100f)
+                        pan += panChange
+                    }
+                }
+        ) {
+            Column(
+                Modifier.graphicsLayer {
+                    scaleX = zoom
+                    scaleY = zoom
+                    translationX = pan.x
+                    translationY = pan.y
+                }
+            ) {
+                pages.forEach { bitmap ->
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "PDF Page",
+                        modifier = Modifier.fillMaxWidth()
+                            .padding(4.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
+@Composable
+fun DrawingScreen(back: () -> Unit) {
+    var points by remember { mutableStateOf(listOf<Offset>()) }
+
+    Column(Modifier.fillMaxSize().background(Color(0xFF202A35))) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Button(onClick = back) { Text("BACK") }
+            Text("2D CAD DRAWING", color = Color.White)
+            Button(onClick = { points = emptyList() }) {
+                Text("CLEAR")
+            }
+        }
+
+        Text("স্ক্রিনে আঙুল দিয়ে আঁকুন", color = Color.White)
+
+        Canvas(
+            Modifier.fillMaxSize()
+                .background(Color.White)
+                .pointerInput(Unit) {
+                    detectTransformGestures { centroid, panChange, _, _ ->
+                        points = points + centroid
+                    }
+                }
+        ) {
+            for (i in 0 until points.size - 1) {
+                drawLine(
+                    color = Color.Blue,
+                    start = points[i],
+                    end = points[i + 1],
+                    strokeWidth = 4f
+                )
+            }
+        }
+    }
+}
