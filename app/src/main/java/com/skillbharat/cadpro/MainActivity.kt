@@ -1,21 +1,13 @@
 
 package com.skillbharat.cadpro
 
-import android.graphics.Bitmap
-import android.graphics.Paint
-import android.graphics.pdf.PdfRenderer
-import android.graphics.pdf.PdfDocument
-import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -25,26 +17,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-data class ShapeItem(
+data class CadShape(
     val type: String,
     val start: Offset,
-    val end: Offset
+    val end: Offset,
+    val layer: String
 )
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent {
-            CadApp()
-        }
+        setContent { CadApp() }
     }
 }
 
@@ -55,43 +42,23 @@ fun CadApp() {
     MaterialTheme {
         Column(
             Modifier.fillMaxSize()
-                .background(Color(0xFFF1F4F8))
+                .background(Color(0xFF101820))
         ) {
-            Row(
-                Modifier.fillMaxWidth()
+            Text(
+                "SKILL BHARAT CAD PRO",
+                color = Color.White,
+                fontSize = 20.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
                     .background(Color(0xFF073B78))
                     .padding(16.dp)
-            ) {
-                Text(
-                    "SKILL BHARAT CAD PRO",
-                    color = Color.White,
-                    fontSize = 20.sp
-                )
-            }
+            )
 
             when (page) {
                 "Home" -> HomeScreen { page = it }
-                "PDF" -> PdfScreen()
-                "Drawing" -> DrawingScreen()
+                "Drawing" -> DrawingScreen { page = "Home" }
                 "3D" -> ThreeDScreen()
                 "Measurement" -> MeasurementScreen()
-                "Projects" -> SimpleScreen("My Projects")
-                "Settings" -> SimpleScreen("Settings")
-            }
-
-            Spacer(Modifier.weight(1f))
-
-            Row(
-                Modifier.fillMaxWidth()
-                    .background(Color(0xFF052954))
-                    .padding(8.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text(
-                    "SKILL BHARAT EDUCATION",
-                    color = Color.White,
-                    fontSize = 12.sp
-                )
             }
         }
     }
@@ -102,297 +69,314 @@ fun HomeScreen(open: (String) -> Unit) {
     Column(
         Modifier.fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .padding(18.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text("Welcome to CAD PRO", fontSize = 24.sp)
-        Text("Select your workspace")
+        Text(
+            "Professional CAD Workspace",
+            color = Color.White,
+            fontSize = 24.sp
+        )
 
-        listOf(
-            "PDF" to "Open PDF Drawing",
-            "Drawing" to "2D Drawing",
-            "3D" to "3D Design",
-            "Measurement" to "Measurement",
-            "Projects" to "My Projects",
-            "Settings" to "Settings"
-        ).forEach { item ->
-            Button(
-                onClick = { open(item.first) },
-                modifier = Modifier.fillMaxWidth()
-                    .height(58.dp)
-            ) {
-                Text(item.second)
-            }
-        }
-    }
-}
-
-@Composable
-fun PdfScreen() {
-    val context = LocalContext.current
-    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
-    var message by remember { mutableStateOf("Open a PDF file") }
-    var zoom by remember { mutableFloatStateOf(1f) }
-    var pan by remember { mutableStateOf(Offset.Zero) }
-
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver
-                    .openFileDescriptor(uri, "r")
-                    ?.use { descriptor ->
-                        val renderer = PdfRenderer(descriptor)
-                        val pdfPage = renderer.openPage(0)
-
-                        val width = 1400
-                        val height = (
-                            width.toFloat() *
-                                pdfPage.height / pdfPage.width
-                        ).toInt()
-
-                        val image = Bitmap.createBitmap(
-                            width,
-                            height,
-                            Bitmap.Config.ARGB_8888
-                        )
-
-                        pdfPage.render(
-                            image,
-                            null,
-                            null,
-                            PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
-                        )
-
-                        pdfPage.close()
-                        renderer.close()
-                        bitmap = image
-                        zoom = 1f
-                        pan = Offset.Zero
-                        message = "PDF opened successfully"
-                    }
-            } catch (e: Exception) {
-                message = "PDF open failed: ${e.message}"
-            }
-        }
-    }
-
-    Column(Modifier.fillMaxSize().padding(10.dp)) {
-        Button(onClick = {
-            picker.launch(arrayOf("application/pdf"))
-        }) {
-            Text("Open PDF")
-        }
-
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Button(onClick = {
-                zoom = (zoom - 0.2f).coerceAtLeast(0.4f)
-            }) {
-                Text("−")
-            }
-
-            Text(" ${(zoom * 100).toInt()}% ")
-
-            Button(onClick = {
-                zoom = (zoom + 0.2f).coerceAtMost(5f)
-            }) {
-                Text("+")
-            }
-
-            Button(onClick = {
-                zoom = 1f
-                pan = Offset.Zero
-            }) {
-                Text("Reset")
-            }
-        }
-
-        Text(message)
-
-        Box(
-            Modifier.fillMaxSize()
-                .background(Color.DarkGray)
-                .pointerInput(Unit) {
-                    detectTransformGestures {
-                            _, panChange, zoomChange, _ ->
-                        zoom = (zoom * zoomChange)
-                            .coerceIn(0.4f, 5f)
-                        pan += panChange
-                    }
-                },
-            contentAlignment = Alignment.Center
+        Button(
+            onClick = { open("Drawing") },
+            modifier = Modifier.fillMaxWidth().height(60.dp)
         ) {
-            bitmap?.let { image ->
-                Image(
-                    bitmap = image.asImageBitmap(),
-                    contentDescription = "PDF page",
-                    modifier = Modifier.fillMaxWidth()
-                        .graphicsLayer {
-                            scaleX = zoom
-                            scaleY = zoom
-                            translationX = pan.x
-                            translationY = pan.y
-                        }
-                )
-            }
+            Text("2D CAD Drawing")
+        }
+
+        Button(
+            onClick = { open("3D") },
+            modifier = Modifier.fillMaxWidth().height(60.dp)
+        ) {
+            Text("3D Design")
+        }
+
+        Button(
+            onClick = { open("Measurement") },
+            modifier = Modifier.fillMaxWidth().height(60.dp)
+        ) {
+            Text("Measurement Tools")
         }
     }
 }
 
 @Composable
-fun DrawingScreen() {
+fun DrawingScreen(back: () -> Unit) {
     var selected by remember { mutableStateOf("Line") }
-    var shapes by remember { mutableStateOf(listOf<ShapeItem>()) }
+    var shapes by remember { mutableStateOf(listOf<CadShape>()) }
+    var redoShapes by remember { mutableStateOf(listOf<CadShape>()) }
     var start by remember { mutableStateOf<Offset?>(null) }
-    var end by remember { mutableStateOf(Offset.Zero) }
+    var current by remember { mutableStateOf(Offset.Zero) }
+    var showGrid by remember { mutableStateOf(true) }
+    var snap by remember { mutableStateOf(false) }
+    var layer by remember { mutableStateOf("Layer 1") }
+    var layerMenu by remember { mutableStateOf(false) }
 
-    Column(Modifier.fillMaxSize().padding(10.dp)) {
-        Text("2D Drawing", fontSize = 22.sp)
+    val tools = listOf(
+        "Line", "Circle", "Rectangle",
+        "Polyline", "Arc", "Polygon"
+    )
 
-        Row {
-            Button(onClick = { selected = "Line" }) {
-                Text("Line")
-            }
-            Button(onClick = { selected = "Circle" }) {
-                Text("Circle")
-            }
-            Button(onClick = { selected = "Rectangle" }) {
-                Text("Rectangle")
+    Column(
+        Modifier.fillMaxSize()
+            .background(Color(0xFF18232F))
+    ) {
+        Button(onClick = back) {
+            Text("Back")
+        }
+
+        Row(
+            Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            tools.forEach { tool ->
+                Button(
+                    onClick = { selected = tool },
+                    modifier = Modifier.padding(3.dp)
+                ) {
+                    Text(tool)
+                }
             }
         }
 
-        Row {
+        Row(
+            Modifier.fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
             Button(onClick = {
-                shapes = shapes.dropLast(1)
-            }) {
-                Text("Undo")
-            }
+                if (shapes.isNotEmpty()) {
+                    redoShapes = redoShapes + shapes.last()
+                    shapes = shapes.dropLast(1)
+                }
+            }) { Text("Undo") }
+
+            Button(onClick = {
+                if (redoShapes.isNotEmpty()) {
+                    shapes = shapes + redoShapes.last()
+                    redoShapes = redoShapes.dropLast(1)
+                }
+            }) { Text("Redo") }
+
             Button(onClick = {
                 shapes = emptyList()
+                redoShapes = emptyList()
+            }) { Text("Clear") }
+
+            Button(onClick = {
+                showGrid = !showGrid
             }) {
-                Text("Clear")
+                Text(if (showGrid) "Grid ON" else "Grid OFF")
+            }
+
+            Button(onClick = {
+                snap = !snap
+            }) {
+                Text(if (snap) "Snap ON" else "Snap OFF")
             }
         }
 
+        Row(
+            Modifier.fillMaxWidth().padding(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("Layer:", color = Color.White)
+
+            Button(onClick = { layerMenu = true }) {
+                Text(layer)
+            }
+
+            DropdownMenu(
+                expanded = layerMenu,
+                onDismissRequest = { layerMenu = false }
+            ) {
+                listOf("Layer 1", "Layer 2", "Layer 3").forEach {
+                    DropdownMenuItem(
+                        text = { Text(it) },
+                        onClick = {
+                            layer = it
+                            layerMenu = false
+                        }
+                    )
+                }
+            }
+        }
+
+        // Drawing Canvas will be added in Part 2
+    }
+}
+
         Canvas(
-            Modifier.fillMaxSize()
-                .background(Color.White)
-                .pointerInput(selected) {
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(Color(0xFF0B1118))
+                .pointerInput(selected, snap, layer) {
                     detectDragGestures(
-                        onDragStart = {
-                            start = it
-                            end = it
+                        onDragStart = { position ->
+                            val point = if (snap) {
+                                Offset(
+                                    (position.x / 20).toInt() * 20f,
+                                    (position.y / 20).toInt() * 20f
+                                )
+                            } else position
+                            start = point
+                            current = point
                         },
                         onDrag = { change, _ ->
-                            end = change.position
+                            current = change.position
                         },
                         onDragEnd = {
-                            start?.let {
-                                shapes = shapes + ShapeItem(
-                                    selected, it, end
+                            start?.let { first ->
+                                shapes = shapes + CadShape(
+                                    selected,
+                                    first,
+                                    current,
+                                    layer
                                 )
+                                redoShapes = emptyList()
                             }
                             start = null
                         }
                     )
                 }
         ) {
-            shapes.forEach {
-                when (it.type) {
-                    "Line" -> drawLine(
-                        Color.Black, it.start, it.end, 3f
+            if (showGrid) {
+                val step = 40f
+                var x = 0f
+                while (x < size.width) {
+                    drawLine(
+                        Color(0xFF263747),
+                        Offset(x, 0f),
+                        Offset(x, size.height),
+                        strokeWidth = 1f
                     )
+                    x += step
+                }
 
-                    "Rectangle" -> drawRect(
-                        Color.Black,
-                        topLeft = Offset(
-                            minOf(it.start.x, it.end.x),
-                            minOf(it.start.y, it.end.y)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(
-                            kotlin.math.abs(it.end.x - it.start.x),
-                            kotlin.math.abs(it.end.y - it.start.y)
-                        ),
-                        style = Stroke(3f)
+                var y = 0f
+                while (y < size.height) {
+                    drawLine(
+                        Color(0xFF263747),
+                        Offset(0f, y),
+                        Offset(size.width, y),
+                        strokeWidth = 1f
                     )
-
-                    "Circle" -> drawCircle(
-                        Color.Black,
-                        radius = kotlin.math.hypot(
-                            it.end.x - it.start.x,
-                            it.end.y - it.start.y
-                        ),
-                        center = it.start,
-                        style = Stroke(3f)
-                    )
+                    y += step
                 }
             }
 
-            start?.let {
-                when (selected) {
-                    "Line" -> drawLine(Color.Red, it, end, 3f)
-                    "Rectangle" -> drawRect(
-                        Color.Red,
-                        topLeft = Offset(
-                            minOf(it.x, end.x),
-                            minOf(it.y, end.y)
-                        ),
-                        size = androidx.compose.ui.geometry.Size(
-                            kotlin.math.abs(end.x - it.x),
-                            kotlin.math.abs(end.y - it.y)
-                        ),
-                        style = Stroke(3f)
+            val allShapes = if (start != null) {
+                shapes + CadShape(
+                    selected,
+                    start!!,
+                    current,
+                    layer
+                )
+            } else shapes
+
+            allShapes.forEach { shape ->
+                val a = shape.start
+                val b = shape.end
+                val color = when (shape.layer) {
+                    "Layer 1" -> Color.Cyan
+                    "Layer 2" -> Color.Yellow
+                    else -> Color.Green
+                }
+
+                when (shape.type) {
+                    "Line" -> drawLine(
+                        color, a, b, strokeWidth = 3f
                     )
-                    "Circle" -> drawCircle(
-                        Color.Red,
-                        radius = kotlin.math.hypot(
-                            end.x - it.x, end.y - it.y
-                        ),
-                        center = it,
-                        style = Stroke(3f)
-                    )
+
+                    "Circle" -> {
+                        val radius = (b - a).getDistance()
+                        drawCircle(
+                            color,
+                            radius,
+                            a,
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
+                        )
+                    }
+
+                    "Rectangle" -> {
+                        drawRect(
+                            color,
+                            topLeft = Offset(
+                                minOf(a.x, b.x),
+                                minOf(a.y, b.y)
+                            ),
+                            size = androidx.compose.ui.geometry.Size(
+                                kotlin.math.abs(b.x - a.x),
+                                kotlin.math.abs(b.y - a.y)
+                            ),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
+                        )
+                    }
+
+                    "Polyline" -> {
+                        val middle = Offset(
+                            (a.x + b.x) / 2,
+                            minOf(a.y, b.y) - 35f
+                        )
+                        drawLine(color, a, middle, 3f)
+                        drawLine(color, middle, b, 3f)
+                    }
+
+                    "Arc" -> {
+                        drawArc(
+                            color = color,
+                            startAngle = 0f,
+                            sweepAngle = 180f,
+                            useCenter = false,
+                            topLeft = Offset(
+                                minOf(a.x, b.x),
+                                minOf(a.y, b.y)
+                            ),
+                            size = androidx.compose.ui.geometry.Size(
+                                kotlin.math.abs(b.x - a.x),
+                                kotlin.math.abs(b.y - a.y)
+                            ),
+                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
+                        )
+                    }
+
+                    "Polygon" -> {
+                        val path = androidx.compose.ui.graphics.Path().apply {
+                            moveTo(a.x, a.y)
+                            lineTo(b.x, a.y)
+                            lineTo((a.x + b.x) / 2, b.y)
+                            close()
+                        }
+                        drawPath(path, color, style =
+                            androidx.compose.ui.graphics.drawscope.Stroke(3f)
+                        )
+                    }
                 }
             }
         }
+
+        Text(
+            "Tool: $selected | Objects: ${shapes.size}",
+            color = Color.White,
+            modifier = Modifier.padding(8.dp)
+        )
     }
 }
 
 @Composable
 fun ThreeDScreen() {
     Column(
-        Modifier.fillMaxSize().padding(16.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+        Modifier.fillMaxSize()
+            .background(Color(0xFF18232F))
+            .padding(16.dp)
     ) {
-        Text("3D Design Preview", fontSize = 22.sp)
-
-        Canvas(
-            Modifier.fillMaxWidth().height(300.dp)
-                .background(Color.White)
-        ) {
-            val a = Offset(size.width * .25f, size.height * .35f)
-            val b = Offset(size.width * .65f, size.height * .35f)
-            val c = Offset(size.width * .65f, size.height * .75f)
-            val d = Offset(size.width * .25f, size.height * .75f)
-            val shift = Offset(70f, -60f)
-
-            drawLine(Color.Blue, a, b, 4f)
-            drawLine(Color.Blue, b, c, 4f)
-            drawLine(Color.Blue, c, d, 4f)
-            drawLine(Color.Blue, d, a, 4f)
-
-            drawLine(Color.Red, a, a + shift, 4f)
-            drawLine(Color.Red, b, b + shift, 4f)
-            drawLine(Color.Red, c, c + shift, 4f)
-            drawLine(Color.Red, d, d + shift, 4f)
-
-            drawLine(Color.Green, a + shift, b + shift, 4f)
-            drawLine(Color.Green, b + shift, c + shift, 4f)
-            drawLine(Color.Green, c + shift, d + shift, 4f)
-            drawLine(Color.Green, d + shift, a + shift, 4f)
-        }
-
-        Text("Basic 3D Preview")
+        Text("3D Design Workspace", color = Color.White, fontSize = 22.sp)
+        Spacer(Modifier.height(20.dp))
+        Text(
+            "3D modelling tools will be added in the next development stage.",
+            color = Color.LightGray
+        )
     }
 }
 
@@ -402,14 +386,16 @@ fun MeasurementScreen() {
     var width by remember { mutableStateOf("10") }
     var unit by remember { mutableStateOf("Feet") }
 
-    val l = length.toDoubleOrNull() ?: 0.0
-    val w = width.toDoubleOrNull() ?: 0.0
+    val area = (length.toDoubleOrNull() ?: 0.0) *
+            (width.toDoubleOrNull() ?: 0.0)
 
     Column(
-        Modifier.fillMaxSize().padding(16.dp),
+        Modifier.fillMaxSize()
+            .background(Color(0xFF18232F))
+            .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Measurement Calculator", fontSize = 22.sp)
+        Text("Measurement Tools", color = Color.White, fontSize = 22.sp)
 
         OutlinedTextField(
             value = length,
@@ -423,24 +409,20 @@ fun MeasurementScreen() {
             label = { Text("Width") }
         )
 
+        Text("Measurement Unit", color = Color.White)
+
         Row {
             listOf("Feet", "Inches", "CM").forEach {
-                TextButton(onClick = { unit = it }) {
+                Button(onClick = { unit = it }) {
                     Text(it)
                 }
             }
         }
 
-        Text("Area: ${l * w} $unit²")
-    }
-}
-
-@Composable
-fun SimpleScreen(title: String) {
-    Column(
-        Modifier.fillMaxSize().padding(20.dp)
-    ) {
-        Text(title, fontSize = 24.sp)
-        Text("Coming soon")
+        Text(
+            "Area: ${"%.2f".format(area)} $unit²",
+            color = Color.Green,
+            fontSize = 20.sp
+        )
     }
 }
