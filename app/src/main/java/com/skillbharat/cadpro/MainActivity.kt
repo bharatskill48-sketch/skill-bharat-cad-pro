@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,8 +50,7 @@ fun CadApp() {
                 "SKILL BHARAT CAD PRO",
                 color = Color.White,
                 fontSize = 20.sp,
-                modifier = Modifier
-                    .fillMaxWidth()
+                modifier = Modifier.fillMaxWidth()
                     .background(Color(0xFF073B78))
                     .padding(16.dp)
             )
@@ -202,10 +203,6 @@ fun DrawingScreen(back: () -> Unit) {
             }
         }
 
-        // Drawing Canvas will be added in Part 2
-    }
-}
-
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
@@ -220,6 +217,7 @@ fun DrawingScreen(back: () -> Unit) {
                                     (position.y / 20).toInt() * 20f
                                 )
                             } else position
+
                             start = point
                             current = point
                         },
@@ -242,16 +240,14 @@ fun DrawingScreen(back: () -> Unit) {
                 }
         ) {
             if (showGrid) {
-                val step = 40f
                 var x = 0f
                 while (x < size.width) {
                     drawLine(
                         Color(0xFF263747),
                         Offset(x, 0f),
-                        Offset(x, size.height),
-                        strokeWidth = 1f
+                        Offset(x, size.height)
                     )
-                    x += step
+                    x += 40f
                 }
 
                 var y = 0f
@@ -259,25 +255,20 @@ fun DrawingScreen(back: () -> Unit) {
                     drawLine(
                         Color(0xFF263747),
                         Offset(0f, y),
-                        Offset(size.width, y),
-                        strokeWidth = 1f
+                        Offset(size.width, y)
                     )
-                    y += step
+                    y += 40f
                 }
             }
 
-            val allShapes = if (start != null) {
-                shapes + CadShape(
-                    selected,
-                    start!!,
-                    current,
-                    layer
-                )
+            val drawing = if (start != null) {
+                shapes + CadShape(selected, start!!, current, layer)
             } else shapes
 
-            allShapes.forEach { shape ->
+            drawing.forEach { shape ->
                 val a = shape.start
                 val b = shape.end
+
                 val color = when (shape.layer) {
                     "Layer 1" -> Color.Cyan
                     "Layer 2" -> Color.Yellow
@@ -285,34 +276,27 @@ fun DrawingScreen(back: () -> Unit) {
                 }
 
                 when (shape.type) {
-                    "Line" -> drawLine(
-                        color, a, b, strokeWidth = 3f
+                    "Line" -> drawLine(color, a, b, 3f)
+
+                    "Circle" -> drawCircle(
+                        color,
+                        (b - a).getDistance(),
+                        a,
+                        style = Stroke(3f)
                     )
 
-                    "Circle" -> {
-                        val radius = (b - a).getDistance()
-                        drawCircle(
-                            color,
-                            radius,
-                            a,
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
-                        )
-                    }
-
-                    "Rectangle" -> {
-                        drawRect(
-                            color,
-                            topLeft = Offset(
-                                minOf(a.x, b.x),
-                                minOf(a.y, b.y)
-                            ),
-                            size = androidx.compose.ui.geometry.Size(
-                                kotlin.math.abs(b.x - a.x),
-                                kotlin.math.abs(b.y - a.y)
-                            ),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
-                        )
-                    }
+                    "Rectangle" -> drawRect(
+                        color,
+                        topLeft = Offset(
+                            minOf(a.x, b.x),
+                            minOf(a.y, b.y)
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            kotlin.math.abs(b.x - a.x),
+                            kotlin.math.abs(b.y - a.y)
+                        ),
+                        style = Stroke(3f)
+                    )
 
                     "Polyline" -> {
                         val middle = Offset(
@@ -323,34 +307,30 @@ fun DrawingScreen(back: () -> Unit) {
                         drawLine(color, middle, b, 3f)
                     }
 
-                    "Arc" -> {
-                        drawArc(
-                            color = color,
-                            startAngle = 0f,
-                            sweepAngle = 180f,
-                            useCenter = false,
-                            topLeft = Offset(
-                                minOf(a.x, b.x),
-                                minOf(a.y, b.y)
-                            ),
-                            size = androidx.compose.ui.geometry.Size(
-                                kotlin.math.abs(b.x - a.x),
-                                kotlin.math.abs(b.y - a.y)
-                            ),
-                            style = androidx.compose.ui.graphics.drawscope.Stroke(3f)
-                        )
-                    }
+                    "Arc" -> drawArc(
+                        color = color,
+                        startAngle = 0f,
+                        sweepAngle = 180f,
+                        useCenter = false,
+                        topLeft = Offset(
+                            minOf(a.x, b.x),
+                            minOf(a.y, b.y)
+                        ),
+                        size = androidx.compose.ui.geometry.Size(
+                            kotlin.math.abs(b.x - a.x),
+                            kotlin.math.abs(b.y - a.y)
+                        ),
+                        style = Stroke(3f)
+                    )
 
                     "Polygon" -> {
-                        val path = androidx.compose.ui.graphics.Path().apply {
+                        val path = Path().apply {
                             moveTo(a.x, a.y)
                             lineTo(b.x, a.y)
                             lineTo((a.x + b.x) / 2, b.y)
                             close()
                         }
-                        drawPath(path, color, style =
-                            androidx.compose.ui.graphics.drawscope.Stroke(3f)
-                        )
+                        drawPath(path, color, style = Stroke(3f))
                     }
                 }
             }
@@ -371,10 +351,14 @@ fun ThreeDScreen() {
             .background(Color(0xFF18232F))
             .padding(16.dp)
     ) {
-        Text("3D Design Workspace", color = Color.White, fontSize = 22.sp)
+        Text(
+            "3D Design Workspace",
+            color = Color.White,
+            fontSize = 22.sp
+        )
         Spacer(Modifier.height(20.dp))
         Text(
-            "3D modelling tools will be added in the next development stage.",
+            "3D modelling tools will be added in the next stage.",
             color = Color.LightGray
         )
     }
@@ -395,7 +379,11 @@ fun MeasurementScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Measurement Tools", color = Color.White, fontSize = 22.sp)
+        Text(
+            "Measurement Tools",
+            color = Color.White,
+            fontSize = 22.sp
+        )
 
         OutlinedTextField(
             value = length,
@@ -426,3 +414,4 @@ fun MeasurementScreen() {
         )
     }
 }
+
